@@ -409,6 +409,20 @@ body.drawing .shell{touch-action:none}
 .givenPart{color:#1a4f9c}
 .slotRow.inline{display:inline-flex;gap:5px;vertical-align:middle;margin:0 3px}
 .slotRow.inline .slot{width:44px;height:52px;font-size:26px}
+/* ===== 실제 글자 조립 모양(초성/중성/받침 위치)으로 빈칸 표시 ===== */
+.sylBox{display:inline-grid;grid-template-columns:.72em .66em;gap:.05em;vertical-align:middle;margin:0 .06em}
+.sylBox.rows2{grid-template-rows:repeat(2,.56em)}
+.sylBox.rows3{grid-template-rows:repeat(3,.5em)}
+.sylBox .choPart{display:flex;align-items:center;justify-content:center;font-size:.58em;font-weight:1000;color:#0a3d84}
+.sylBox .jongGiven{display:flex;align-items:center;justify-content:center;font-size:.46em;font-weight:1000;color:#0a3d84}
+.sylBox .slot{min-width:0;min-height:0;width:100%;height:100%}
+.sylBox .slot small,.sylStack .slot small{display:none}
+.sylBox .slot b,.sylStack .slot b{font-size:.85em}
+.sylStack{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 .06em;gap:.06em}
+.sylStack .baseChar{line-height:1}
+.sylStack .jongRow{display:flex;gap:6px}
+.sylStack .jongRow .slot{width:.55em;height:.42em;min-width:0;min-height:0}
+.sylStack .jongRow .batchimBlank{margin-left:0;font-size:.4em;min-width:.9em;border-bottom-width:5px}
 .sentGrid{grid-template-columns:1fr!important}
 .answerBtn.sentBtn{font-size:clamp(15px,3.2vw,20px)!important;min-height:56px!important;
   line-height:1.35;padding:10px 12px;text-align:left}
@@ -1246,6 +1260,31 @@ function clueHtml(word){
   return '<div class="picHint">🔤</div>';
 }
 
+/* 모음/받침 빈칸을 실제 글자 안 위치(초성 옆, 아래 등)에 그대로 표시 */
+function cvBoxHtml(cur){
+  const hasJong=!!cur.jong;
+  return '<span class="sylBox '+(hasJong?'rows3':'rows2')+'" id="slots">'+
+    '<span class="choPart" style="grid-column:1;grid-row:1">'+esc(cur.cho)+'</span>'+
+    '<span class="slot" data-i="0" style="grid-column:1;grid-row:2"></span>'+
+    '<span class="slot" data-i="1" style="grid-column:2;grid-row:1/span 2"></span>'+
+    (hasJong?'<span class="jongGiven" style="grid-column:1/span 2;grid-row:3">'+esc(cur.jong)+'</span>':'')+
+  '</span>';
+}
+function dblStackHtml(cur){
+  return '<span class="sylStack" id="slots">'+
+    '<span class="baseChar">'+esc(cur.open)+'</span>'+
+    '<span class="jongRow">'+
+      '<span class="slot" data-i="0"></span>'+
+      '<span class="slot" data-i="1"></span>'+
+    '</span>'+
+  '</span>';
+}
+function batStackHtml(cur){
+  return '<span class="sylStack">'+
+    '<span class="baseChar">'+esc(cur.open)+'</span>'+
+    '<span class="jongRow"><span class="batchimBlank">?</span></span>'+
+  '</span>';
+}
 function renderQ(){
   if(course.i>=course.q.length){nextPhase();return;}
   cur=course.q[course.i];locked=false;sp=0;
@@ -1281,27 +1320,23 @@ function renderQ(){
       '<div class="prompt">'+esc(cur.ask)+'</div></div>'+
       sentCard+
       '<div class="focusRow">'+
-        '<div class="wordFocus">'+esc(cur.pre+cur.open)+'<span class="batchimBlank">?</span>'+esc(cur.post)+'</div>'+
+        '<div class="wordFocus">'+esc(cur.pre)+batStackHtml(cur)+esc(cur.post)+'</div>'+
         (picOf(cur.w)?'<div class="picMini">'+PICS[cur.w].e+'</div>':'')+
       '</div>'+
       '<div class="answerGrid">'+shuffle([cur.ans,...shuffle(BAT_POOL.filter(x=>x!==cur.ans)).slice(0,3)])
         .map(o=>'<button class="answerBtn jamoChoiceBtn" data-v="'+o+'">'+o+'</button>').join('')+'</div>';
   }else if(T==='cv'||T==='dbl'){
-    const slots=cur.seq.map((_,i)=>'<div class="slot" data-i="'+i+'"></div>').join('');
     let pool=T==='cv'?["ㅗ","ㅜ","ㅏ","ㅓ","ㅐ","ㅔ","ㅣ","ㅡ"]
                      :["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ","ㅈ","ㅌ","ㅎ"];
     const set=[...new Set([...cur.seq,...pool])].slice(0,8);
     cur.seq.forEach(s=>{if(!set.includes(s))set.push(s);});
-    const given = T==='cv'
-      ? '<span class="givenPart">'+esc(cur.pre+cur.cho)+'</span>'
-      : '<span class="givenPart">'+esc(cur.pre+cur.open)+'</span>';
-    const tail = T==='cv' ? esc((cur.jong||'')+cur.post) : esc(cur.post);
+    const box = T==='cv' ? cvBoxHtml(cur) : dblStackHtml(cur);
     body=
       '<div class="questionTop"><button class="speaker" id="speakQ">🔊</button>'+
       '<div class="prompt">'+esc(cur.ask)+'</div></div>'+
       sentCard+
       '<div class="focusRow">'+
-        '<div class="wordFocus">'+given+'<span class="slotRow inline" id="slots">'+slots+'</span>'+tail+'</div>'+
+        '<div class="wordFocus">'+esc(cur.pre)+box+esc(cur.post)+'</div>'+
         (picOf(cur.w)?'<div class="picMini">'+PICS[cur.w].e+'</div>':'')+
       '</div>'+
       '<div class="jamoChoiceRow">'+shuffle(set).map(o=>
@@ -1897,7 +1932,7 @@ function paintVoiceClips(){
 }
 function playVoiceClip(slot){
   const c=(st.voiceClips||{})[slot];if(!c)return false;
-  try{new Audio(c).play();return true;}catch(e){return false;}
+  try{const a=new Audio(c);a.volume=0.5;a.play();return true;}catch(e){return false;}
 }
 async function startVoiceRecording(slot){
   const btn=document.querySelector('.recBtn[data-slot="'+slot+'"]'),status=document.querySelector('.recStatus[data-slot="'+slot+'"]');
