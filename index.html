@@ -1261,17 +1261,19 @@ function clueHtml(word){
 }
 
 /* 모음/받침 빈칸을 실제 글자 안 위치(초성 옆, 아래 등)에 그대로 표시 */
-function cvBoxHtml(cur){
+function cvBoxHtml(cur,interactive){
   const hasJong=!!cur.jong;
-  return '<span class="sylBox '+(hasJong?'rows3':'rows2')+'" id="slots">'+
+  const idAttr=interactive===false?'':' id="slots"';
+  return '<span class="sylBox '+(hasJong?'rows3':'rows2')+'"'+idAttr+'>'+
     '<span class="choPart" style="grid-column:1;grid-row:1">'+esc(cur.cho)+'</span>'+
     '<span class="slot" data-i="0" style="grid-column:1;grid-row:2"></span>'+
     '<span class="slot" data-i="1" style="grid-column:2;grid-row:1/span 2"></span>'+
     (hasJong?'<span class="jongGiven" style="grid-column:1/span 2;grid-row:3">'+esc(cur.jong)+'</span>':'')+
   '</span>';
 }
-function dblStackHtml(cur){
-  return '<span class="sylStack" id="slots">'+
+function dblStackHtml(cur,interactive){
+  const idAttr=interactive===false?'':' id="slots"';
+  return '<span class="sylStack"'+idAttr+'>'+
     '<span class="baseChar">'+esc(cur.open)+'</span>'+
     '<span class="jongRow">'+
       '<span class="slot" data-i="0"></span>'+
@@ -1284,6 +1286,21 @@ function batStackHtml(cur){
     '<span class="baseChar">'+esc(cur.open)+'</span>'+
     '<span class="jongRow"><span class="batchimBlank">?</span></span>'+
   '</span>';
+}
+/* 예문 안에서도 실제 글자 조립 위치 그대로 빈칸을 보여줌 (자음 옆에 나란히 X) */
+function sentCardHtml(cur){
+  if(!cur.sentBlank)return '';
+  let inner;
+  if((cur.t==='bat'||cur.t==='dbl')&&cur.sent&&cur.sent.indexOf(cur.w)>=0){
+    const idx=cur.sent.indexOf(cur.w);
+    const pre=cur.sent.slice(0,idx)+cur.pre;
+    const post=cur.post+cur.sent.slice(idx+cur.w.length);
+    const box=cur.t==='bat'?batStackHtml(cur):dblStackHtml(cur,false);
+    inner=esc(pre)+box+esc(post);
+  }else{
+    inner=esc(cur.sentBlank);
+  }
+  return '<div class="exSent"><span class="exLabel">📖 예문</span><div class="exText">'+inner+'</div></div>';
 }
 function renderQ(){
   if(course.i>=course.q.length){nextPhase();return;}
@@ -1303,10 +1320,7 @@ function renderQ(){
     '</div>';
 
   let body='';
-  const sentCard = cur.sentBlank
-    ? '<div class="exSent"><span class="exLabel">📖 예문</span>'+
-      '<div class="exText">'+esc(cur.sentBlank)+'</div></div>'
-    : '';
+  const sentCard = sentCardHtml(cur);
   if(T==='pair'||T==='sent'){
     const opts=shuffle([cur.w,cur.x]);
     body=
